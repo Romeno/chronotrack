@@ -63,6 +63,10 @@ class Chronotrack:
         result = self.request("event", event_id, "bracket")
         return result
 
+    def intervals(self, event_id):
+        result = self.request("event", event_id, "intervals")
+        return result
+
 
 
 
