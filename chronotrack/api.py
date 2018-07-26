@@ -64,9 +64,12 @@ class Chronotrack:
         return result
 
     def intervals(self, event_id):
-        result = self.request("event", event_id, "intervals")
+        result = self.request("event", event_id, "interval")
         return result
 
+    def races(self, event_id):
+        result = self.request("race", event_id, "race")
+        return result
 
 
 
