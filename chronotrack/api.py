@@ -1,6 +1,9 @@
-import requests
 import hashlib
 import json
+
+import requests
+
+from . import exceptions
 
 
 AUTH_OAUTH2_WEB_FLOW = 0
@@ -55,21 +58,247 @@ class Chronotrack:
         if r.ok:
             return json.loads(r.content.decode('utf8'))
 
+    ######################################################
+    # APIs
+
+    # Events
     def events(self):
         result = self.request("event")
+
         return result
 
-    def brackets(self, event_id):
-        result = self.request("event", event_id, "bracket")
+    def event(self, event_id):
+        result = self.request("event", resource_id=event_id)
+
         return result
 
+    # Races
+    def races(self, event_id):
+        result = self.request("event", event_id, "race")
+
+        return result
+
+    def race(self, race_id):
+        result = self.request("race", race_id)
+
+        return result
+
+    # Entries
+    def entries(self, event_id=None, race_id=None, group_id=None):
+        args = [event_id, race_id, group_id]
+        if args.count(None) != 2:
+            exceptions.InvalidCallError("Only one of {} {} {} must present".format('event_id', 'race_id', 'group_id'))
+
+        if event_id:
+            result = self.request("event", event_id, "entry")
+        elif race_id:
+            result = self.request("race", race_id, "entry")
+        elif group_id:
+            result = self.request("groups", group_id, "entry")
+        else:
+            raise exceptions.MissingParamError("{} or {} must present".format('event_id', 'race_id'))
+
+        return result
+
+    def entry(self, entry_id):
+        result = self.request("entry", entry_id)
+
+        return result
+
+    # Results
+    def results(self, event_id=None, race_id=None, bracket_id=None):
+        if event_id:
+            result = self.request("event", event_id, "results")
+        elif race_id:
+            result = self.request("race", race_id, "results")
+        elif bracket_id:
+            result = self.request("bracket", bracket_id, "results")
+        else:
+            raise exceptions.MissingParamError("{} or {} or {} must present".format('event_id', 'race_id', 'bracket_id'))
+
+        return result
+
+    # Intervals
     def intervals(self, event_id):
         result = self.request("event", event_id, "interval")
+
         return result
 
-    def races(self, event_id):
-        result = self.request("race", event_id, "race")
+    def interval(self, interval_id):
+        result = self.request("interval", interval_id)
+
         return result
+
+
+    # Brackets
+    def brackets(self, event_id=None, race_id=None):
+        """
+        Get all brackets of event or race
+        """
+        if event_id:
+            result = self.request("event", event_id, "bracket")
+        elif race_id:
+            result = self.request("race", race_id, "bracket")
+        else:
+            raise exceptions.MissingParamError("{} or {} must present".format('event_id', 'race_id'))
+
+        return result
+
+    def bracket(self, bracket_id):
+        """
+        Get bracket info
+        """
+        result = self.request("bracket", bracket_id)
+
+        return result
+
+    # Waves
+    def waves(self, event_id=None, race_id=None):
+        """
+        Get all waves of an event or race
+        One and only one of the following parameters is required
+
+        :param event_id: id of an event to get waves by
+        :param race_id: id of a race to get waves by
+        :return:
+        """
+        args = [event_id, race_id]
+        if args.count(None) != 1:
+            exceptions.InvalidCallError("Only one of {} {} must present".format('event_id', 'race_id'))
+
+        result = []
+        if event_id:
+            result = self.request("event", event_id, "wave")
+        elif race_id:
+            result = self.request("race", race_id, "wave")
+
+        return result
+
+    def wave(self, wave_id):
+        """
+        Get wave info
+        :param wave_id: id of a wave
+        :return:
+        """
+        result = self.request("wave", wave_id)
+
+        return result
+
+    # Timing points
+    def timing_points(self, event_id=None, race_id=None, interval_id=None):
+        """
+        Get all timing points of an event, race or interval
+        One and only one of the following parameters is required
+
+        :param event_id: Event id to get timing points by
+        :param race_id: Race id to get timing points by
+        :param interval_id: Interval id to get timing points by
+        :return:
+        """
+        args = [event_id, race_id, interval_id]
+        if args.count(None) != 2:
+            exceptions.InvalidCallError("Only one of {} {} {} must present".format('event_id', 'race_id', 'interval_id'))
+
+        result = {}
+        if event_id is not None:
+            result = self.request("event", event_id, "timing-point")
+        elif race_id is not None:
+            result = self.request("race", race_id, "timing-point")
+        elif interval_id is not None:
+            result = self.request("interval", interval_id, "timing-point")
+
+        return result
+
+    def timing_point(self, timing_point_id):
+        result = self.request("timing-point", timing_point_id)
+
+        return result
+
+    # Timing devices
+    def timing_devices(self, event_id=None, race_id=None, interval_id=None, timing_point_id=None):
+        """
+        Get all timing devices of an event, race, interval or timing point
+        One and only one of the following parameters is required
+
+        :param event_id: Event id to get timing devices by
+        :param race_id: Race id to get timing devices by
+        :param interval_id: Interval id to get timing devices by
+        :param timing_point_id: Timing point id to get timing devices by
+        :return:
+        """
+        args = [event_id, race_id, interval_id, timing_point_id]
+        if args.count(None) != 3:
+            exceptions.InvalidCallError("Only one of {} {} {} {} must present".format('event_id', 'race_id', 'interval_id', 'timing_point_id'))
+
+        result = {}
+        if event_id is not None:
+            result = self.request("event", event_id, "timing-device")
+        elif race_id is not None:
+            result = self.request("race", race_id, "timing-device")
+        elif interval_id is not None:
+            result = self.request("interval", interval_id, "timing-device")
+        elif timing_point_id is not None:
+            result = self.request("timing-point", timing_point_id, "timing-device")
+
+        return result
+
+    def timing_device(self, timing_device_id=None):
+        result = self.request("timing-device", timing_device_id)
+
+        return result
+
+    # Timing mats
+    def timing_mats(self, timing_device_id):
+        """
+        Get timing mats by id of timing device
+        :param timing_device_id: id of timing device
+        :return:
+        """
+        result = self.request("timing-device", timing_device_id, "timing-mat")
+
+        return result
+
+    def timing_mat(self, timing_mat_id):
+        """
+        Get timing mat info
+        :param timing_mat_id: Id of timing mat
+        :return:
+        """
+        result = self.request("timing-mat", timing_mat_id)
+
+        return result
+
+    # Groups
+    def groups(self, event_id=None, entry_id=None):
+        args = [event_id, entry_id]
+        if args.count(None) != 1:
+            exceptions.InvalidCallError("Only one of {} {} must present".format('event_id', 'entry_id'))
+
+        result = {}
+        if event_id is not None:
+            result = self.request("event", event_id, "groups")
+        elif entry_id is not None:
+            result = self.request("entry", entry_id, "groups")
+
+        return result
+
+    def group(self, group_id):
+        result = self.request("groups", group_id)
+
+        return result
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
