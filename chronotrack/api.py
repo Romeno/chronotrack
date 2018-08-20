@@ -30,14 +30,14 @@ class Chronotrack:
     def set_auth_type(self, auth_type):
         self.auth_type = auth_type
 
-    def set_debug(self, debug):
+    def set_debug(self, debug=True):
         self.debug = debug
         if self.debug:
             self.endpoint = API_ENDPOINTS["test"]
         else:
             self.endpoint = API_ENDPOINTS["production"]
 
-    def request(self, resource_name, *args, format="json", method="GET", resource_id=None, sub_resource_name=None, **kwargs):
+    def request(self, resource_name, resource_id=None, sub_resource_name=None, *args, format="json", method="GET", **kwargs):
         url = self.endpoint
 
         # authentication params
@@ -89,6 +89,7 @@ class Chronotrack:
         if args.count(None) != 2:
             exceptions.InvalidCallError("Only one of {} {} {} must present".format('event_id', 'race_id', 'group_id'))
 
+        result = {}
         if event_id:
             result = self.request("event", event_id, "entry")
         elif race_id:
@@ -96,7 +97,7 @@ class Chronotrack:
         elif group_id:
             result = self.request("groups", group_id, "entry")
         else:
-            raise exceptions.MissingParamError("{} or {} must present".format('event_id', 'race_id'))
+            raise exceptions.MissingParamError("{} or {} must present".format('event_id', 'race_id', 'group_id'))
 
         return result
 
@@ -106,21 +107,44 @@ class Chronotrack:
         return result
 
     # Results
-    def results(self, event_id=None, race_id=None, bracket_id=None):
+    def results(self, event_id=None, race_id=None, bracket_id=None, interval_id=None):
+        args = [event_id, race_id, bracket_id, interval_id]
+        if args.count(None) != 3:
+            exceptions.InvalidCallError("Only one of {} {} {} {} must present".format('event_id', 'race_id', 'bracket_id', 'interval_id'))
+
+        result = {}
         if event_id:
             result = self.request("event", event_id, "results")
         elif race_id:
             result = self.request("race", race_id, "results")
         elif bracket_id:
             result = self.request("bracket", bracket_id, "results")
+        elif interval_id:
+            result = self.request("interval", interval_id, "results")
         else:
-            raise exceptions.MissingParamError("{} or {} or {} must present".format('event_id', 'race_id', 'bracket_id'))
+            raise exceptions.MissingParamError("{} or {} or {} or {} must present".format('event_id', 'race_id', 'bracket_id', 'interval_id'))
 
         return result
 
     # Intervals
-    def intervals(self, event_id):
-        result = self.request("event", event_id, "interval")
+    def intervals(self, event_id=None, race_id=None):
+        """
+        Get all intervals of an event or race
+        One and only one of the following parameters is required
+
+        :param event_id: id of an event to get intervals by
+        :param race_id: id of a race to get intervals by
+        :return:
+        """
+        args = [event_id, race_id]
+        if args.count(None) != 1:
+            exceptions.InvalidCallError("Only one of {} {} must present".format('event_id', 'race_id'))
+
+        result = []
+        if event_id:
+            result = self.request("event", event_id, "interval")
+        elif race_id:
+            result = self.request("race", event_id, "interval")
 
         return result
 
@@ -129,12 +153,20 @@ class Chronotrack:
 
         return result
 
-
     # Brackets
     def brackets(self, event_id=None, race_id=None):
         """
         Get all brackets of event or race
+        One and only one of the following parameters is required
+
+        :param event_id: id of an event to get brackets by
+        :param race_id: id of a race to get brackets by
+        :return:
         """
+        args = [event_id, race_id]
+        if args.count(None) != 1:
+            exceptions.InvalidCallError("Only one of {} {} must present".format('event_id', 'race_id'))
+
         if event_id:
             result = self.request("event", event_id, "bracket")
         elif race_id:
@@ -171,6 +203,8 @@ class Chronotrack:
             result = self.request("event", event_id, "wave")
         elif race_id:
             result = self.request("race", race_id, "wave")
+        else:
+            raise exceptions.MissingParamError("{} or {} must present".format('event_id', 'race_id'))
 
         return result
 
@@ -206,6 +240,8 @@ class Chronotrack:
             result = self.request("race", race_id, "timing-point")
         elif interval_id is not None:
             result = self.request("interval", interval_id, "timing-point")
+        else:
+            raise exceptions.MissingParamError("{} or {} or {} must present".format('event_id', 'race_id', 'interval_id'))
 
         return result
 
@@ -239,6 +275,8 @@ class Chronotrack:
             result = self.request("interval", interval_id, "timing-device")
         elif timing_point_id is not None:
             result = self.request("timing-point", timing_point_id, "timing-device")
+        else:
+            raise exceptions.MissingParamError("{} or {} or {} or {} must present".format('event_id', 'race_id', 'interval_id', 'timing_point_id'))
 
         return result
 
@@ -279,6 +317,8 @@ class Chronotrack:
             result = self.request("event", event_id, "groups")
         elif entry_id is not None:
             result = self.request("entry", entry_id, "groups")
+        else:
+            raise exceptions.MissingParamError("{} or {} must present".format('event_id', 'entry_id'))
 
         return result
 
