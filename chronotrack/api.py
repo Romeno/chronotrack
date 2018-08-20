@@ -144,7 +144,9 @@ class Chronotrack:
         if event_id:
             result = self.request("event", event_id, "interval")
         elif race_id:
-            result = self.request("race", event_id, "interval")
+            result = self.request("race", race_id, "interval")
+        else:
+            raise exceptions.MissingParamError("{} or {} must present".format('event_id', 'race_id'))
 
         return result
 
