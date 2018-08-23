@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="chronotrack",
-    version="0.0.3",
+    version="0.0.4",
     author="Romeno",
     author_email="RomenoEx@gmail.com",
     description="chronotrack API python interface",
