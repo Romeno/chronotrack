@@ -30,6 +30,7 @@ class Chronotrack:
         self.endpoint = API_ENDPOINTS["test"]
         self.log_filepath = log_filepath
         init_logger(log_filepath)
+        self.logger = logging.getLogger(self.log_filepath)
 
     def set_auth_type(self, auth_type):
         self.auth_type = auth_type
@@ -63,7 +64,40 @@ class Chronotrack:
 
         r = requests.request(method=method, url=url)
         if r.ok:
-            return json.loads(r.content.decode('utf8'))
+            j = json.loads(r.content.decode('utf8'))
+            total_count = r.headers.get("X-Ctlive-Row-Count")
+            if total_count:
+                total_count = int(total_count)
+
+            page_count = r.headers.get("X-Ctlive-Page-Count")
+            if page_count:
+                page_count = int(page_count)
+
+            page_size = r.headers.get("X-Ctlive-Page-Size")
+            if page_size:
+                page_size = int(page_size)
+
+            current_page = r.headers.get("X-Ctlive-Current-Page")
+            if current_page:
+                current_page = int(current_page)
+
+            return {
+                "data": j,
+                "meta": {
+                    "total_count": total_count,
+                    "page_count": page_count,
+                    "page_size": page_size,
+                    "current_page": current_page,
+                }
+            }
+        else:
+            return {
+                "data": {},
+                "meta": {},
+                "error": {
+                    "status": r.status_code,
+                }
+            }
 
     ######################################################
     # APIs
@@ -71,60 +105,65 @@ class Chronotrack:
     # Events
     def events(self):
         result = self.request("event")
+        result["data"] = result["data"].get("event", [])
 
-        return result.get("event", [])
+        return result
 
     def event(self, event_id):
         result = self.request("event", resource_id=event_id)
+        result["data"] = result["data"].get("event", {})
 
-        return result.get("event", {})
+        return result
 
     # Races
     def races(self, event_id):
         result = self.request("event", event_id, "race")
+        result["data"] = result["data"].get("event_race", [])
 
-        return result.get("event_race", [])
+        return result
 
     def race(self, race_id):
         result = self.request("race", race_id)
+        result["data"] = result["data"].get("event_race", {})
 
-        return result.get("event_race", {})
+        return result
 
     # Entries
-    def entries(self, event_id=None, race_id=None, group_id=None):
+    def entries(self, event_id=None, race_id=None, group_id=None, **kwargs):
         args = [event_id, race_id, group_id]
         if args.count(None) != 2:
             exceptions.InvalidCallError("Only one of {} {} {} must present".format('event_id', 'race_id', 'group_id'))
 
         result = {}
         if event_id:
-            result = self.request("event", event_id, "entry")
+            result = self.request("event", event_id, "entry", **kwargs)
+            result["data"] = result["data"].get("event_entry", [])
 
-            return result["event_entry"]
+            return result
         elif race_id:
-            result = self.request("race", race_id, "entry")
+            result = self.request("race", race_id, "entry", **kwargs)
+            result["data"] = result["data"].get("race_entry", [])
 
-            return result["race_entry"]
+            return result
         elif group_id:
-            result = self.request("groups", group_id, "entry")
+            result = self.request("groups", group_id, "entry", **kwargs)
+            result["data"] = result["data"].get("group_entry", [])
 
-            return result["group_entry"]
+            return result
         else:
             raise exceptions.MissingParamError("{} or {} must present".format('event_id', 'race_id', 'group_id'))
 
     def entry(self, entry_id):
         result = self.request("entry", entry_id)
+        result["data"] = result["data"].get("entry", {})
 
-        return result["entry"]
+        return result
 
     # Results
-    def results(self, event_id=None, race_id=None, bracket_id=None, interval_id=None):
-        logger = logging.getLogger(self.log_filepath)
-
+    def results(self, event_id=None, race_id=None, bracket_id=None, interval_id=None, **kwargs):
         if event_id is not None and race_id is not None:
-            logger.warning("event_id ignored as race_id is suffuciaent to get the results")
+            self.logger.warning("event_id ignored as race_id is suffucient to get the results")
 
-        kwargs = {}
         if bracket_id:
             kwargs["bracket"] = bracket_id
 
@@ -134,19 +173,27 @@ class Chronotrack:
         result = {}
         if race_id:
             result = self.request("race", race_id, "results", **kwargs)
-            return result.get("race_results", [])
+            result["data"] = result["data"].get("race_results", [])
+
+            return result
         elif event_id:
             result = self.request("event", event_id, "results", **kwargs)
-            return result.get("event_results", [])
+            result["data"] = result["data"].get("event_results", [])
+
+            return result
         elif bracket_id:
             # we dont care about bracket duplicating in query and path because API permits that. Which is strange
             result = self.request("bracket", bracket_id, "results", **kwargs)
-            return result.get("bracket_results", [])
+            result["data"] = result["data"].get("bracket_results", [])
+
+            return result
         elif interval_id:
             # strangely enough documentation says API for intervals does not support bracket as query param
             # but on practise it works. So bracket keeping bracket id
             result = self.request("interval", interval_id, "results", **kwargs)
-            return result.get("iterval_results", [])
+            result["data"] = result["data"].get("iterval_results", [])
+
+            return result
         else:
             raise exceptions.MissingParamError(
                 "{} or {} or {} or {} must present".format('event_id', 'race_id', 'bracket_id', 'interval_id'))
@@ -168,19 +215,22 @@ class Chronotrack:
         result = []
         if event_id:
             result = self.request("event", event_id, "interval")
+            result["data"] = result["data"].get("event_interval", [])
 
-            return result.get("event_interval", [])
+            return result
         elif race_id:
             result = self.request("race", race_id, "interval")
+            result["data"] = result["data"].get("race_interval", [])
 
-            return result.get("race_interval", [])
+            return result
         else:
             raise exceptions.MissingParamError("{} or {} must present".format('event_id', 'race_id'))
 
     def interval(self, interval_id):
         result = self.request("interval", interval_id)
+        result["data"] = result["data"].get("interval", {})
 
-        return result.get("interval", {})
+        return result
 
     # Brackets
     def brackets(self, event_id=None, race_id=None):
@@ -198,12 +248,14 @@ class Chronotrack:
 
         if event_id:
             result = self.request("event", event_id, "bracket")
+            result["data"] = result["data"].get("event_bracket", [])
 
-            return result.get("event_bracket", [])
+            return result
         elif race_id:
             result = self.request("race", race_id, "bracket")
+            result["data"] = result["data"].get("race_bracket", [])
 
-            return result.get("race_bracket", [])
+            return result
         else:
             raise exceptions.MissingParamError("{} or {} must present".format('event_id', 'race_id'))
 
@@ -212,8 +264,9 @@ class Chronotrack:
         Get bracket info
         """
         result = self.request("bracket", bracket_id)
+        result["data"] = result["data"].get("bracket", {})
 
-        return result.get("bracket", {})
+        return result
 
     # Waves
     def waves(self, event_id=None, race_id=None):
@@ -232,12 +285,17 @@ class Chronotrack:
         result = []
         if event_id:
             result = self.request("event", event_id, "wave")
+            result["data"] = result["data"].get("event_wave", [])
+
+            return result
         elif race_id:
             result = self.request("race", race_id, "wave")
+            result["data"] = result["data"].get("race_wave", [])
+
+            return result
         else:
             raise exceptions.MissingParamError("{} or {} must present".format('event_id', 'race_id'))
 
-        return result
 
     def wave(self, wave_id):
         """
@@ -246,6 +304,7 @@ class Chronotrack:
         :return:
         """
         result = self.request("wave", wave_id)
+        result["data"] = result["data"].get("wave", {})
 
         return result
 
@@ -267,17 +326,26 @@ class Chronotrack:
         result = {}
         if event_id is not None:
             result = self.request("event", event_id, "timing-point")
+            result["data"] = result["data"].get("event_timing_point", [])
+
+            return result
         elif race_id is not None:
             result = self.request("race", race_id, "timing-point")
+            result["data"] = result["data"].get("race_timing_point", [])
+
+            return result
         elif interval_id is not None:
             result = self.request("interval", interval_id, "timing-point")
+            result["data"] = result["data"].get("interval_timing_point", [])
+
+            return result
         else:
             raise exceptions.MissingParamError("{} or {} or {} must present".format('event_id', 'race_id', 'interval_id'))
 
-        return result
 
     def timing_point(self, timing_point_id):
         result = self.request("timing-point", timing_point_id)
+        result["data"] = result["data"].get("timing_point", {})
 
         return result
 
@@ -300,19 +368,30 @@ class Chronotrack:
         result = {}
         if event_id is not None:
             result = self.request("event", event_id, "timing-device")
+            result["data"] = result["data"].get("event_timing_device", [])
+
+            return result
         elif race_id is not None:
             result = self.request("race", race_id, "timing-device")
+            result["data"] = result["data"].get("race_timing_device", [])
+
+            return result
         elif interval_id is not None:
             result = self.request("interval", interval_id, "timing-device")
+            result["data"] = result["data"].get("interval_timing_device", [])
+
+            return result
         elif timing_point_id is not None:
             result = self.request("timing-point", timing_point_id, "timing-device")
+            result["data"] = result["data"].get("timing_point_timing_device", [])
+
+            return result
         else:
             raise exceptions.MissingParamError("{} or {} or {} or {} must present".format('event_id', 'race_id', 'interval_id', 'timing_point_id'))
 
-        return result
-
     def timing_device(self, timing_device_id=None):
         result = self.request("timing-device", timing_device_id)
+        result["data"] = result["data"].get("timing_device", {})
 
         return result
 
@@ -324,6 +403,7 @@ class Chronotrack:
         :return:
         """
         result = self.request("timing-device", timing_device_id, "timing-mat")
+        result["data"] = result["data"].get("timing_mat", [])
 
         return result
 
@@ -334,6 +414,7 @@ class Chronotrack:
         :return:
         """
         result = self.request("timing-mat", timing_mat_id)
+        result["data"] = result["data"].get("timing_mat", {})
 
         return result
 
@@ -346,15 +427,20 @@ class Chronotrack:
         result = {}
         if event_id is not None:
             result = self.request("event", event_id, "groups")
+            result["data"] = result["data"].get("event_group", [])
+
+            return result
         elif entry_id is not None:
             result = self.request("entry", entry_id, "groups")
+            result["data"] = result["data"].get("entry_group", [])
+
+            return result
         else:
             raise exceptions.MissingParamError("{} or {} must present".format('event_id', 'entry_id'))
 
-        return result
-
     def group(self, group_id):
         result = self.request("groups", group_id)
+        result["data"] = result["data"].get("group", {})
 
         return result
 
